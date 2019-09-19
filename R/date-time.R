@@ -4,7 +4,7 @@ make_current_timestamp <- function(fmt = "%Y-%m-%d", use_seconds = FALSE, second
   sysTime <- Sys.time()
   timestamp <- format(sysTime, fmt)
   if (use_seconds)
-    timestamp <- paste(timestamp, sprintf("%05d", lubridate::period_to_seconds(hms(format(Sys.time(), "%H:%M:%S")))), sep = seconds_sep)
+    timestamp <- paste(timestamp, sprintf("%05d", lubridate::period_to_seconds(hms::hms(format(Sys.time(), "%H:%M:%S")))), sep = seconds_sep)
 
   return (timestamp)
 }
