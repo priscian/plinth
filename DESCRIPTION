@@ -1,13 +1,22 @@
 Package: plinth
-Title: What the Package Does (One Line, Title Case)
-Version: 0.0.0.9000
-Authors@R: 
-    person(given = "First",
-           family = "Last",
-           role = c("aut", "cre"),
-           email = "first.last@example.com",
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
-License: What license it uses
+Title: Provide "Keystone" Functions for Most Scripts or Packages
+Version: 0.1.0
+Authors@R: person("Jim", "Java", email = "priscian@gmail.com", role = c("aut", "cre"))
+Description: Provide "keystone" functions for most scripts or packages.
+Depends: R (>= 3.5.0)
+Imports: utils, tools, R.utils, pryr, digest, devtools,
+  tidyr, data.table, plyr, dplyr, dtplyr, purrr, janitor, naniar, reshape2,
+  rlist,
+  stringr,
+  zoo,
+  rio,
+  httr,
+  lubridate,
+  grDevices, devEMF, ggplot2, scales, RColorBrewer, colorscience,
+  stats, Hmisc, rms,
+  strucchange, segmented
+Suggests: knitr, pander, testthat
+Remotes: github::priscian/plinth, github::skgrange/threadr
+License: Artistic-2.0
 Encoding: UTF-8
 LazyData: true
