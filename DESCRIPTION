@@ -4,14 +4,14 @@ Version: 0.1.0
 Authors@R: person("Jim", "Java", email = "priscian@gmail.com", role = c("aut", "cre"))
 Description: Provide "keystone" functions for most scripts or packages.
 Depends: R (>= 3.5.0)
-Imports: utils, tools, R.utils, pryr, digest, devtools,
+Imports: utils, tools, methods, R.utils, pryr, digest, devtools,
   tidyr, data.table, plyr, dplyr, dtplyr, purrr, janitor, naniar, reshape2,
   rlist,
   stringr,
   zoo,
   rio,
   httr,
-  lubridate,
+  lubridate, hms,
   grDevices, devEMF, ggplot2, scales, RColorBrewer, colorscience,
   stats, Hmisc, rms,
   strucchange, segmented
