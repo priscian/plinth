@@ -1,10 +1,10 @@
 #' @export
-make_current_timestamp <- function(fmt = "%Y-%m-%d", use_seconds = FALSE, seconds_sep = '+')
+make_current_timestamp <- function(fmt = "%Y-%m-%d", use_seconds = FALSE, seconds_sep = "+")
 {
   sysTime <- Sys.time()
   timestamp <- format(sysTime, fmt)
   if (use_seconds)
-    timestamp <- paste(timestamp, sprintf("%05d", lubridate::period_to_seconds(hms::hms(format(Sys.time(), "%H:%M:%S")))), sep = seconds_sep)
+    timestamp <- paste(timestamp, sprintf("%05d", lubridate::period_to_seconds(lubridate::hms(format(Sys.time(), "%H:%M:%S")))), sep = seconds_sep)
 
   return (timestamp)
 }
@@ -13,9 +13,9 @@ make_current_timestamp <- function(fmt = "%Y-%m-%d", use_seconds = FALSE, second
 ## For non-decreasing dates, possibly with NAs, get 'diff()' whose sum equals last(x) - first(x).
 #' @export
 #' @importFrom zoo na.locf
-diffs <- function(x, to_na=NULL, ...)
+diffs <- function(x, to_na = NULL, ...)
 {
-  r <- diff(zoo::na.locf(x, na.rm=FALSE), ...)
+  r <- diff(zoo::na.locf(x, na.rm = FALSE), ...)
   if (!is.null(to_na))
     is.na(r) <- r %in% to_na
 

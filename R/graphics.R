@@ -109,6 +109,7 @@ vary_brightness <- function(color, len, end = NULL)
 change_luminance <- function(col, lum = 1.0) { as.vector(apply(sapply(col, grDevices::col2rgb) / 255, 2, function(x) { x <- x + lum; x[x > 1.0] <- 1.0; grDevices::rgb(x[1], x[2], x[3]) })) } # Also see 'scales::col2hcl()'.
 
 
+#' @export
 color_nm_map <- c(
   red = 700,
   orange = 620,

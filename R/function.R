@@ -201,7 +201,7 @@ cordon <- function(fun, ...,
           dir.create(dirname(file_path), recursive = TRUE)
 
         if (timestamp)
-          filePath <- paste(tools::file_path_sans_ext(file_path), do.call("make_current_timestamp", timestampArgs), sep='_') %_% '.' %_% file_ext(file_path)
+          filePath <- paste(tools::file_path_sans_ext(file_path), do.call("make_current_timestamp", timestampArgs), sep="_") %_% "." %_% tools::file_ext(file_path)
 
         if (verbose) cat("Saving data file \"" %_% filePath %_% "\".... ")
         save(list = variables, file = filePath, envir = evalEnv)

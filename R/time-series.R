@@ -73,7 +73,7 @@ plot_series <- function(
   w <- interpNA(y, "linear", unwrap = TRUE)
 
   ## Create moving-average variables if requested.
-  w[, series] <- MA(w[, series], ma, sides = ma_sides); w <- zoo(w, order.by = index(y))
+  w[, series] <- MA(w[, series], ma, sides = ma_sides); w <- zoo::zoo(w, order.by = zoo::index(y))
   maText <- ""
   if (!is.null(ma))
     maText <- "(" %_% ma %_% "-month moving average)"
