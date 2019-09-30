@@ -276,3 +276,246 @@ plot_series <- function(
 
   return (nop())
 }
+
+
+## Style suggested by https://tamino.wordpress.com/2014/12/04/a-pause-or-not-a-pause-that-is-the-question/
+#' @export
+plot_sequential_trend <- function(
+  x, # A data frame
+  series,
+  x_var,
+  start = NULL, end = NULL,
+  rate_multiplier = 1,
+  main = NULL, xlab = NULL, ylab = NULL,
+  use_polygon = FALSE,
+  mark_xs = NULL,
+  baseline = FALSE,
+  plot... = list(),
+  ci... = list(),
+  vline... = list(),
+  m_text = NULL,
+  ...
+)
+{
+  d <- x
+  if (!is.null(start))
+    d <- x[x[[x_var]] >= start, ]
+
+  series <- series[1L]
+
+  means <- unclass(by(d[[series]], d[[x_var]], mean, na.rm = TRUE))
+  xNames <- names(means)
+  means <- as.vector(means); names(means) <- xNames
+  means <- means[na_unwrap(means)]
+  rates <- rep(NA, length(means))
+  rates <- data.frame(rate = rates, lwr = rates, upr = rates)
+  rownames(rates) <- names(means)
+  xs <- as.numeric(rownames(rates))
+
+  local({
+    for (i in seq_along(means)) {
+      y <- means[i:length(means)]
+      x <- as.numeric(names(y))
+
+      m <- stats::lm(y ~ x)
+      r <- stats::coef(m)[2L] * rate_multiplier
+      ci <- suppressWarnings(t(stats::confint(m, "x"))) * rate_multiplier
+      rates[i, ] <<- c(r, ci)
+    }
+  })
+
+  if (is.null(start)) start <- head(xs, 1L)
+  if (is.null(end)) end <- tail(xs, 1L)
+
+  attr(rates, "series") <- series
+  attr(rates, "trend_start") <- start
+  attr(rates, "trend_end") <- tail(xs, 1L)
+
+  ccRates <- rates[xs <= end & stats::complete.cases(rates), ]
+  ccXs <- as.numeric(rownames(ccRates))[xs <= end & stats::complete.cases(rates)]
+
+  plotArgs <- list(
+    x = ccXs,
+    y = ccRates[, "rate"],
+    type = "o",
+    pch = 16,
+    #ylim = c(-1.0, 1.0),
+    ylim = c(min(ccRates[, "lwr"]), max(ccRates[, "upr"])),
+    lwd = 2,
+    col = "black",
+    panel.first = quote(abline(h = 0.0, col = "darkgray", lty = "dashed")),
+    xlab = ifelse(!is_invalid(xlab), xlab, "Start value of trend"),
+    ylab = ifelse(!is_invalid(ylab), ylab, "Trend"),
+    main = ifelse(!is_invalid(main), main, "Linear Trend + 95% CIs")
+  )
+  plotArgs <- utils::modifyList(plotArgs, plot...)
+
+  if (is.language(plotArgs$main))
+    plotArgs$main <- eval(plotArgs$main)
+
+  if (is.null(m_text))
+    m_text <- quote("Trend from start value to " %_% tail(names(means), 1))
+
+  if (dev.cur() == 1) # If a graphics device is active, plot there instead of opening a new device.
+    dev.new(width = 12.5, height = 7.3) # New default device of 1200 × 700 px at 96 DPI.
+  do.call(plot, plotArgs)
+  mtext(eval(m_text))
+
+  if (use_polygon) {
+    ciArgs <- list(
+      x = c(ccXs, rev(ccXs)),
+      y = c(ccRates[, "lwr"], rev(ccRates[, "upr"])),
+      col = alpha("gray", 0.6),
+      border = NA # Border color; NULL means use par("fg"), NA omits borders.
+    )
+    ciArgs <- modifyList(ciArgs, ci...)
+
+    do.call(graphics::polygon, ciArgs)
+  }
+  else { # Use error bars to show confidence intervals.
+    ciArgs <- list(
+      x0 = ccXs,
+      y0 = ccRates[, "lwr"],
+      x1 = ccXs,
+      y1 = ccRates[, "upr"],
+      length = 0.03,
+      angle = 90,
+      code = 3
+    )
+    ciArgs <- utils::modifyList(ciArgs, ci...)
+
+    do.call(graphics::arrows, ciArgs)
+  }
+
+  if (!is.null(mark_xs)) {
+    vlineArgs <- list(
+      mark_x = mark_xs,
+      abline... = list(abline... = list(col = alpha("red", 0.4)))
+    )
+    vlineArgs <- utils::modifyList(vlineArgs, vline...)
+
+    do.call(vline, vlineArgs)
+  }
+
+  return (rates)
+}
+
+
+#' @export
+create_smooth_variables <- function(
+  x,
+  series = NULL,
+  x_var,
+  unwrap = TRUE,
+  force_names = TRUE,
+  pad_by = NULL,
+  seq... = list(),
+  interpNA... = list(),
+  loess_suffix = " (LOESS fit)",
+  loess... = list(),
+  interpolated_suffix = " (interpolated)",
+  keep_interpolated = FALSE,
+  deriv = NULL, # 0, 1, or 2
+  frfast... = list(),
+  deriv_suffix_template = " (derivative %d)",
+  lower_ci_suffix = "_lower", upper_ci_suffix = "_upper",
+  interpolated_derivative = TRUE,
+  verbose = FALSE,
+  ...
+)
+{
+  if (is.null(series))
+    series <- colnames(x)[colnames(x) != x_var]
+
+  d <- tibble::as_tibble(x)
+  if (unwrap)
+    d <- subset(d, na_unwrap(d[, series]))
+
+  seqArgs <- list(
+    from = min(d[[x_var]], na.rm = TRUE),
+    to = max(d[[x_var]], na.rm = TRUE),
+    by = pad_by
+  )
+  seqArgs <- utils::modifyList(seqArgs, seq...)
+
+  if (!is.null(pad_by)) {
+    seq_vals <- do.call(seq, seqArgs)
+    temp <- sort(unique(c(d[[x_var]], seq_vals)))
+    tbl <- dataframe(temp); names(tbl) <- x_var
+    d <- dplyr::right_join(d, tbl, by = x_var)
+  }
+
+  interpNAArgs <- list(
+    method = "fmm"
+  )
+
+  if (is.numeric(series) && force_names)
+    series <- colnames(d)[series]
+
+  for (i in series) {
+    if (verbose) cat("  Processing column \"" %_% i %_% "\".... ")
+
+    interpNAArgs$x <- d[, i]
+    interpNAArgs <- utils::modifyList(interpNAArgs, interpNA...)
+    d[[i %_% interpolated_suffix]] <- drop(do.call(interpNA, interpNAArgs))
+
+    loessArgs = list(
+      formula = eval(substitute(s ~ x_var, list(s = as.name(i %_% interpolated_suffix), x_var = as.name(x_var)))),
+      data = d,
+      span = 0.2
+    )
+    loessArgs <- utils::modifyList(loessArgs, loess...)
+
+    l <- do.call(stats::loess, loessArgs)
+    d[[i %_% loess_suffix]] <- stats::predict(l, newdata = d[[x_var]]) # Use 'newdata' here to include NAs.
+
+    ## Create an estimated derivative variable using 'npregfast::frfast()'.
+    if (interpolated_derivative)
+      gam_data <- dataframe(d[, x_var, drop = FALSE], y = d[[i %_% interpolated_suffix]]) %>% tidyr::drop_na() # Complete cases only
+    else
+      gam_data <- dataframe(x[, x_var, drop = FALSE], y = x[[i]]) %>% tidyr::drop_na() # Complete cases only
+
+    temp <- if (!is.null(pad_by)) seq_vals else x[[x_var]]
+    kbin <- sum(temp >= min(gam_data[[x_var]], na.rm = TRUE) & temp <= max(gam_data[[x_var]], na.rm = TRUE))
+
+    frfastArgs <- list(
+      formula = eval(substitute(y ~ s(x_var, k = knots), list(x_var = as.name(x_var), knots = ifelse(NROW(gam_data) < 10, NROW(gam_data), 10)))),
+      data = gam_data,
+      #h0 = -1,
+      kbin = kbin,
+      nboot = 100,
+      smooth = "splines",
+      seed = 666,
+      cluster = FALSE,
+      ncores = NULL
+    )
+    frfastArgs <- utils::modifyList(frfastArgs, frfast...)
+
+    if (frfastArgs$smooth != "splines")
+      frfastArgs$formula <- eval(substitute(y ~ x_var, list(x_var = as.name(x_var))))
+
+    if (!is.null(deriv)) {
+      z <- do.call(npregfast::frfast, frfastArgs)
+      zz <- dataframe(z$x, z$p[, 1, 1], z$pl[, deriv + 1, 1], z$p[, deriv + 1, 1], z$pu[, deriv + 1, 1])
+      colnames(zz) <- c(x_var, i, paste0(i %_% sprintf(deriv_suffix_template, deriv), c(lower_ci_suffix, "", upper_ci_suffix)))
+
+      # interpNAArgs$x <- zz
+      # interpNAArgs <- utils::modifyList(interpNAArgs, interpNA...)
+      # zz <- drop(do.call(interpNA, interpNAArgs))
+
+      if (is.null(attr(d, "frfast")))
+        attr(d, "frfast") <- zz
+      else
+        attr(d, "frfast") <- dplyr::full_join(attr(d, "frfast"), zz, by = x_var)
+    }
+
+    if (!keep_interpolated)
+      d[[i %_% interpolated_suffix]] <- NULL
+
+    if (verbose) { cat("Done.", fill = TRUE); flush.console() }
+  }
+
+  attr(d, "frfast") <- dplyr::arrange(attr(d, "frfast"), voltage)
+
+  d
+}

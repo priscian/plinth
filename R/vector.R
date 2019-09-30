@@ -126,15 +126,15 @@ shift.default <- function (x, i = 1L, roll = TRUE, na_rm = FALSE)
 
 ## usage:
 # shift(1:10)
-# shift(1:10, roll=FALSE)
+# shift(1:10, roll = FALSE)
 # shift(1:10, -1)
-# shift(1:10, -1, roll=FALSE)
+# shift(1:10, -1, roll = FALSE)
 # shift(1:10, 5)
-# shift(1:10, 5, roll=FALSE)
+# shift(1:10, 5, roll = FALSE)
 # shift(1:10, -5)
-# shift(1:10, -5, roll=FALSE)
-# shift(1:10, 5, roll=FALSE, na_rm=TRUE)
-# shift(1:10, -5, roll=FALSE, na_rm=TRUE)
+# shift(1:10, -5, roll = FALSE)
+# shift(1:10, 5, roll = FALSE, na_rm = TRUE)
+# shift(1:10, -5, roll = FALSE, na_rm = TRUE)
 
 
 #' @export
@@ -180,14 +180,19 @@ chunk.matrix <- function(x, size, ...)
 }
 
 
+## Which values of 'v' are closest to the given values of 'x'?
 #' @export
+#' @import data.table
+
 nearest <- function(v, x, value = FALSE)
 {
-  d <- data.table(v, value = v)
-  setattr(d, "sorted", "v")
-  setkey(d, v) # Sort the data
+  d <- data.table::data.table(v, value = v)
+  data.table::setattr(d, "sorted", "v")
+  data.table::setkey(d, v) # Sort the data
 
   ## Binary search
+  ## N.B. Can't really get at 'J()' without making this package depend on "data.table" --
+  ## V. https://stackoverflow.com/questions/22001945/how-is-j-function-implemented-in-data-table
   m <- d[J(x), roll = "nearest"]$value
 
   l <- which(v == m)
@@ -199,10 +204,10 @@ nearest <- function(v, x, value = FALSE)
 }
 
 #' @export
-nearest_below <- function(v, x, value=FALSE) { l <- which(v == max(v[(v < x)])); if (value) v[l] else l }
+nearest_below <- function(v, x, value = FALSE) { l <- which(v == max(v[(v < x)])); if (value) v[l] else l }
 
 #' @export
-nearest_above <- function(v, x, value=FALSE) { l <- which(v == min(v[(v > x)])); if (value) v[l] else l }
+nearest_above <- function(v, x, value = FALSE) { l <- which(v == min(v[(v > x)])); if (value) v[l] else l }
 
 
 ## http://stackoverflow.com/questions/16357962/r-split-numeric-vector-at-position

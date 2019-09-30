@@ -159,7 +159,6 @@ add_na <- function(x, ...)
 
 
 #' @export
-#' @importFrom gdata reorder.factor
 order_levels <- function(x, ...,
   index = FALSE,
   frequency = TRUE,

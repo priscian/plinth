@@ -12,7 +12,6 @@ make_current_timestamp <- function(fmt = "%Y-%m-%d", use_seconds = FALSE, second
 
 ## For non-decreasing dates, possibly with NAs, get 'diff()' whose sum equals last(x) - first(x).
 #' @export
-#' @importFrom zoo na.locf
 diffs <- function(x, to_na = NULL, ...)
 {
   r <- diff(zoo::na.locf(x, na.rm = FALSE), ...)
