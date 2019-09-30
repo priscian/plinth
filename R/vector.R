@@ -182,7 +182,6 @@ chunk.matrix <- function(x, size, ...)
 
 ## Which values of 'v' are closest to the given values of 'x'?
 #' @export
-#' @import data.table
 
 nearest <- function(v, x, value = FALSE)
 {
