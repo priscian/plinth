@@ -1,10 +1,10 @@
 Package: plinth
 Title: Provide "Keystone" Functions for Most Scripts or Packages
-Version: 0.1.1
+Version: 0.2.0
 Authors@R: person("Jim", "Java", email = "priscian@gmail.com", role = c("aut", "cre"))
 Description: Provide "keystone" functions for most scripts or packages.
 Depends: R (>= 3.5.0)
-Imports: utils, tools, methods, R.utils, pryr, digest, devtools, gdata,
+Imports: utils, tools, methods, R.utils, rlang, pryr, digest, devtools, gdata,
   tidyr, tibble, plyr, dplyr, data.table, dtplyr, purrr, janitor, naniar, reshape2,
   rlist,
   stringr,

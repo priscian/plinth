@@ -105,3 +105,21 @@ interpNA <- function (x, method = c("linear", "before", "after", "none"), unwrap
 ## 'cumsum()' with 'na.rm = TRUE' equivalent.
 #' @export
 cum_sum <- function(x, ...) `[<-`(x, !is.na(x), cumsum(na.omit(x), ...))
+
+
+## V. https://stackoverflow.com/questions/2602583/geometric-mean-is-there-a-built-in/25555105#25555105
+#' @export
+geometric_mean <- function(x, na.rm = TRUE, zero.propagate = FALSE)
+{
+  if (any(x < 0, na.rm = TRUE)) {
+    return (NaN)
+  }
+  if (zero.propagate) {
+    if(any(x == 0, na.rm = TRUE)) {
+      return (0)
+    }
+    exp(mean(log(x), na.rm = na.rm))
+  } else {
+    exp(sum(log(x[x > 0]), na.rm = na.rm) / length(x))
+  }
+}

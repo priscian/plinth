@@ -2,7 +2,6 @@
 #' @export
 fit_segmented_model <- function(x,
   series,
-  col = colorspace::rainbow_hcl(length(series)),
   start = NULL, end = NULL,
   yearly = FALSE, x_var = NULL,
   breakpoints... = list(),
@@ -12,28 +11,15 @@ fit_segmented_model <- function(x,
 {
   r <- list(data = x, series = series)
   r$range <- list(start = start, end = end)
-  r$col <- col
-  length(r$col) <- length(r$series); names(r$col) <- r$series
 
-  if (!yearly) {
-    g <- r$data
-  }
-  else { # This won't work for non-climeseries data.
-    g <- as.data.frame(make_yearly_data(r$data))
-    if (!is.null(start)) start <- trunc(start)
-    if (!is.null(end)) end <- trunc(end)
-  }
-
-  xVar <- ifelse(yearly, "year", "yr_part")
-  if (!is.null(x_var))
-    xVar <- x_var
+  g <- r$data
+  xVar <- x_var
 
   r$piecewise <- list()
   for (i in r$series) {
     r$piecewise[[i]] <- list()
-    r$piecewise[[i]]$col <- r$piecewise$col[i]
 
-    h <- oss(g, i, common_columns = x_var)[na_unwrap(g[[i]]), , drop = FALSE]
+    h <- oss(g, i, common_columns = xVar)[na_unwrap(g[[i]]), , drop = FALSE]
     h <- h[h[[xVar]] >= ifelse(!is.null(start), start, -Inf) & h[[xVar]] <= ifelse(!is.null(end), end, Inf), ]
 
     breakpointsArgs <- list(

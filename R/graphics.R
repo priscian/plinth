@@ -194,7 +194,7 @@ vline <- function(mark_x, abline... = list(), text... = list())
 {
   ablineArgs <- list(
     v = mark_x,
-    col = alpha("black", 0.4),
+    col = scales::alpha("black", 0.4),
     lty = "dashed"
   )
   ablineArgs <- utils::modifyList(ablineArgs, abline...)
