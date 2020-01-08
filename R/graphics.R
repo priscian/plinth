@@ -197,7 +197,7 @@ vline <- function(mark_x, abline... = list(), text... = list())
     col = scales::alpha("black", 0.4),
     lty = "dashed"
   )
-  ablineArgs <- utils::modifyList(ablineArgs, abline...)
+  ablineArgs <- utils::modifyList(ablineArgs, abline..., keep.null = TRUE)
   do.call(graphics::abline, ablineArgs)
 
   textArgs <- list(
@@ -208,7 +208,7 @@ vline <- function(mark_x, abline... = list(), text... = list())
     srt = 270,
     adj = c(NA, -0.25)
   )
-  textArgs <- utils::modifyList(textArgs, text...)
+  textArgs <- utils::modifyList(textArgs, text..., keep.null = TRUE)
   do.call(graphics::text, textArgs)
 
   nop()

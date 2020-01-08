@@ -13,7 +13,7 @@ rcv <- function(x, na.rm = FALSE, IQR... = list())
     na.rm = na.rm,
     type = 7
   )
-  IQRArgs <- utils::modifyList(IQRArgs, IQR...)
+  IQRArgs <- utils::modifyList(IQRArgs, IQR..., keep.null = TRUE)
 
   0.75 * (do.call(stats::IQR, IQRArgs) / stats::median(x, na.rm = na.rm))
 }

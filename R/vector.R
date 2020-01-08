@@ -169,7 +169,7 @@ chunk.data.frame <- function(x, size, ...)
 {
   s <- chunk.default(seq(NROW(x)), size, ...)
 
-  sapply(s, function(y) x[y, ], simplify = FALSE)
+  sapply(s, function(y) x[y, , drop = FALSE], simplify = FALSE)
 }
 
 

@@ -7,24 +7,20 @@ get_dots <- function(..., evaluate = FALSE)
     callerName <- as.list(sys.call(-1L))[[1L]]
     formalArguments <- names(formals(caller))
   }
-  #unevaluated <- substitute(...()) # List of '...' name-value pairs.
   unevaluated <- eval(substitute(alist(...)))
-  dotsAsCharacter <- unlist(sapply(unevaluated, deparse, simplify = TRUE))
-  dotsNames <- names(dotsAsCharacter)
-  if (is.null(dotsNames))
-    dotsNames <- rep("", length(dotsAsCharacter))
+  dotsNames <- names(unevaluated)
+  if (is_invalid(dotsNames))
+    dotsNames <- rep("", length(unevaluated))
 
   rv <- list()
   if (!is.null(sys.call(-2L)))
     rv$calling_function <- as.list(sys.call(-2L))[[1L]]
   rv$current_function <- callerName
   rv$current_formals <- formalArguments
-  #rv$... <- environment()$`...`
   rv$arguments <- as.list(unevaluated)
   if (evaluate)
     rv$evaluated <- list(...)
-  rv$as_character <- dotsAsCharacter
-  rv$named_dots <- dotsNames
+  rv$dots_names <- dotsNames
   whichDots <- which(formalArguments == "...")
   if (length(whichDots) == 0L)
     whichDots <- ifelse(length(formalArguments) == 0L, 1L, length(formalArguments))
@@ -127,7 +123,7 @@ cordon <- function(fun, ...,
     use_seconds = TRUE,
     seconds_sep = '+'
   )
-  timestampArgs <- utils::modifyList(timestampArgs, timestamp...)
+  timestampArgs <- utils::modifyList(timestampArgs, timestamp..., keep.null = TRUE)
 
   if (archive_) {
     if (is.null(file_path))
@@ -158,26 +154,21 @@ cordon <- function(fun, ...,
     if (verbose) { cat("Done.", fill = TRUE); flush.console() }
   }
   else if (run_) {
-    evalEnv <- new.env()
+    temp <- fun
+    #body(temp) <- as.call(c(as.name("{"), expression({ browser(); return (environment()) }))) # for debugging
+    body(temp) <- as.call(c(as.name("{"), expression({ return (environment()) })))
+    argList <- list()
 
-    ## Add default arguments of 'fun' to argument list.
-    argList <- as.list(formals(fun))
-    hasDots <- FALSE
-    if (!is.null(argList[["..."]])) hasDots <- TRUE
-    argList[["..."]] <- NULL
     dots <- get_dots(..., evaluate = evaluate_dots)
     ## Add '...' arguments to argument list.
     dotsArguments <- dots$arguments
     if (evaluate_dots) dotsArguments <- dots$evaluated
-    argList <- utils::modifyList(argList, dotsArguments[dots$named_dots != ""]) # Replace duplicate named arguments with those from '...' and add new named arguments.
-    argList <- c(argList, dotsArguments[dots$named_dots == ""]) # Tack on unnamed arguments from '...'.
+    argList <- utils::modifyList(argList, dotsArguments[dots$dots_names != ""], keep.null = TRUE) # Replace duplicate named arguments with those from '...' and add new named arguments.
+    argList <- c(argList, dotsArguments[dots$dots_names == ""]) # Tack on unnamed arguments from '...'.
     ## Add 'arguments' to 'argList'.
-    argList <- utils::modifyList(argList, arguments[names(arguments) != ""]) # Replace duplicate named arguments with those from 'arguments' and add new named arguments.
+    argList <- utils::modifyList(argList, arguments[names(arguments) != ""], keep.null = TRUE) # Replace duplicate named arguments with those from 'arguments' and add new named arguments.
     argList <- c(argList, arguments[names(arguments) == ""]) # Tack on unnamed arguments from 'arguments'.
 
-    temp <- fun
-    body(temp) <- as.call(c(as.name("{"), expression(return (environment()))))
-    ## Return environment containing complete set of new arguments, including '...', for 'fun()'.
     evalEnv <- do.call(temp, argList)
 
     ## Evaluate the body of 'fun()' in the environment created.
@@ -185,7 +176,7 @@ cordon <- function(fun, ...,
 
     ## Pick out the variables to keep.
     if (is.null(variables))
-      variables <- setdiff(ls(evalEnv, all = TRUE), c(names(formals(fun))))
+      variables <- setdiff(ls(evalEnv, all.names = TRUE), c(names(formals(fun))))
 
     ## N.B. Not used yet.
     variableNames <- variables

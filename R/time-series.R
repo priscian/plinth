@@ -38,6 +38,7 @@ plot_series <- function(
   x_var,
   start = NULL, end = NULL,
   ma = NULL, ma_sides = 1L,
+  interpolate = FALSE,
   plot_type = c("single", "multiple"),
   type = "l",
   col = NULL, col_fun = colorspace::rainbow_hcl, col_fun... = list(l = 65), alpha = 0.5, lwd = 2,
@@ -70,13 +71,33 @@ plot_series <- function(
 
   y <- zoo::zoo(x[, c(x_var, series, ci_series)], order.by = x[[x_var]])
   y <- subset(y, na_unwrap(as.matrix(y[, c(series, ci_series)]))) # Remove trailing NAs.
-  w <- interpNA(y, "linear", unwrap = TRUE)
+
+  w <- y
+  if (is.null(ma)) local({
+    interpCols <- NULL
+    if (is.logical(interpolate)) {
+      if (all(interpolate))
+        w <<- interpNA(w, "linear", unwrap = TRUE)
+      else if (any(interpolate)) {
+        interpCols <- series[interpolate]
+      }
+    }
+    else {
+      interpCols <- interpolate
+    }
+
+    if (!is.null(interpCols)) {
+      for (i in interpCols)
+        w[, i] <<- drop(interpNA(w[, i], "linear", unwrap = TRUE))
+    }
+  })
 
   ## Create moving-average variables if requested.
-  w[, c(series, ci_series)] <- MA(w[, c(series, ci_series)], ma, sides = ma_sides); w <- zoo::zoo(w, order.by = zoo::index(y))
   maText <- ""
-  if (!is.null(ma))
+  if (!is.null(ma)) {
+    w[, c(series, ci_series)] <- MA(w[, c(series, ci_series)], ma, sides = ma_sides); w <- zoo::zoo(w, order.by = zoo::index(y))
     maText <- "(" %_% ma %_% "-month moving average)"
+  }
 
   y <- stats::window(y, start = start, end = end, extend = TRUE) # N.B. This can't be 'extend()'ed.
   w <- stats::window(w, start = start, end = end, extend = TRUE)
@@ -89,7 +110,7 @@ plot_series <- function(
     col_funArgs <- list(
       n = length(col)
     )
-    col_funArgs <- utils::modifyList(col_funArgs, col_fun...)
+    col_funArgs <- utils::modifyList(col_funArgs, col_fun..., keep.null = TRUE)
     col <- suppressWarnings(do.call(col_fun, col_funArgs))
     ## Some other possible function calls:
     #col <- grDevices::rainbow(length(col))
@@ -111,7 +132,7 @@ plot_series <- function(
       units = "in",
       res = 600
     )
-    pngArgs <- utils::modifyList(pngArgs, png...)
+    pngArgs <- utils::modifyList(pngArgs, png..., keep.null = TRUE)
     do.call(grDevices::png, pngArgs)
   }
 
@@ -121,8 +142,68 @@ plot_series <- function(
     dev.new(width = 12.5, height = 7.3) # New default device of 1200 × 700 px at 96 DPI.
     #dev.new(width = 7.3, height = 7.3) # New default device of 700 × 700 px at 96 DPI.
 
-  if (!add)
-    plot(w[, series], plot.type = plot_type, type = "n", xaxs = "r", xaxt = "s", xlab = xlab, ylab = ylab, main = main, ...)
+  ## Find CIs now so that plot region can expand automatically to accomodate them.
+  if (conf_int) {
+    confintNames <- intersect(series %_% conf_int_suffix, colnames(w))
+    if (length(confintNames) != 0L) {
+      seriesNames <- stringr::str_match(confintNames, "^(.*?)" %_% conf_int_suffix %_% "$")[, 2L]
+      polygon_args <- sapply(seq_along(confintNames),
+        function(i)
+        {
+          value <- w[, seriesNames[i]]
+          ci <- w[, confintNames[i]]
+          upper <- value + ci/2; lower <- value - ci/2
+          ciCol <- scales::alpha(col[seriesNames[i]], ci_alpha)
+          cidf <- dataframe(x = y[, x_var], lower = lower, upper = upper) %>% tidyr::drop_na()
+
+          polygonArgs <- list(
+            x = c(cidf$x, rev(cidf$x)),
+            y = c(cidf$upper, rev(cidf$lower)),
+            col = ciCol,
+            border = NA
+          )
+          polygonArgs <- utils::modifyList(polygonArgs, polygon..., keep.null = TRUE)
+
+          polygonArgs
+        }, simplify = FALSE)
+
+      names(polygon_args) <- confintNames
+    }
+  }
+
+  ## If there are CIs & 'ylim' is NULL, make extra vertical room for the CIs.
+  dots <- get_dots(...)
+  y_lim <- dots$arguments$ylim
+
+  if (is.null(y_lim) && exists("polygon_args")) {
+    range_y_ci <- sapply(polygon_args,
+      function(i) { r <- range(i$y, na.rm = TRUE); names(r) <- c("lo", "hi"); r },
+      simplify = FALSE)
+    range_y_series <- sapply(series,
+      function(i) { r <- range(w[, i, drop = FALSE], na.rm = TRUE); names(r) <- c("lo", "hi"); r },
+      simplify = FALSE)
+
+    range_y <- c(range_y_ci, range_y_series); elmNames <- names(range_y)
+    y_lims <- Reduce(rbind, range_y); rownames(y_lims) <- elmNames
+
+    y_lim <- c(min(y_lims, na.rm = TRUE), max(y_lims, na.rm = TRUE))
+  }
+
+  plotArgs1 <- list(
+    x <- w[, series],
+    plot.type = plot_type,
+    type = "n",
+    xaxs = "r", xaxt = "s",
+    xlab = xlab, ylab = ylab, main = main
+  )
+  plotArgs1 <- utils::modifyList(plotArgs1, dots$arguments, keep.null = TRUE)
+  plotArgs1$ylim <- y_lim
+
+  if (!add) {
+    op <- par(mar = c(5, 5, 4, 2) + 0.1) # Add some extra space for exponents &c. on the left margin.
+    #plot(w[, series], plot.type = plot_type, type = "n", xaxs = "r", xaxt = "s", xlab = xlab, ylab = ylab, main = main, ...)
+    do.call("plot", plotArgs1)
+  }
   if (maText != "") graphics::mtext(maText, 3L)
 
   ## N.B. I need more control over the grid here:
@@ -134,37 +215,45 @@ plot_series <- function(
   if (!is.null(start_callback))
     eval(start_callback)
 
-  if (conf_int) { # Plot confidence bands for series that have them.
-    confintNames <- intersect(series %_% conf_int_suffix, colnames(w))
-    if (length(confintNames) != 0L) {
-      seriesNames <- stringr::str_match(confintNames, "^(.*?)" %_% conf_int_suffix %_% "$")[, 2L]
-      for (i in seq_along(confintNames)) {
-        value <- w[, seriesNames[i]]
-        ci <- w[, confintNames[i]]
-        upper <- value + ci/2; lower <- value - ci/2
-        ciCol <- scales::alpha(col[seriesNames[i]], ci_alpha)
-        cidf <- dataframe(x = y[, x_var], lower = lower, upper = upper) %>% tidyr::drop_na()
-
-        polygonArgs <- list(
-          x = c(cidf$x, rev(cidf$x)),
-          y = c(cidf$upper, rev(cidf$lower)),
-          col = ciCol,
-          border = NA
-        )
-        polygonArgs <- utils::modifyList(polygonArgs, polygon...)
-        do.call(graphics::polygon, polygonArgs)
-      }
-    }
+  ## Plot confidence bands for series that have them.
+  if (conf_int) {
+    if (exists("polygon_args"))
+      plyr::l_ply(polygon_args, function(i) do.call(what = graphics::polygon, args = i))
   }
 
   par(new = TRUE)
   if (add) {
+    plotArgs2 <- list(
+      x = wz[, plotSeries[i]],
+      type = type,
+      col = col[i], lwd = lwd,
+      bty = "n",
+      xaxt = "n", yaxt = "n",
+      xlab = "", ylab = ""
+    )
+    plotArgs2 <- utils::modifyList(plotArgs2, dots$arguments, keep.null = TRUE)
+    plotArgs2$ylim <- y_lim
+
     plotSeries <- series
     for (i in seq_along(plotSeries))
-      lines(wz[, plotSeries[i]], type = type, col = col[i], lwd = lwd, bty = "n", xaxt = "n", yaxt = "n", xlab = "", ylab = "", ...) # I.e. 'plot.zoo()'.
+      #lines(wz[, plotSeries[i]], type = type, col = col[i], lwd = lwd, bty = "n", xaxt = "n", yaxt = "n", xlab = "", ylab = "", ...) # I.e. 'plot.zoo()'.
+      do.call("lines", plotArgs2)
   }
-  else
-    plot(wz[, series], screens = 1L, plot.type = plot_type, type = type, col = col, lwd = lwd, bty = "n", xaxt = "n", yaxt = "n", xlab = "", ylab = "", ...) # I.e. 'plot.zoo()'.
+  else {
+    plotArgs2 <- list(
+      x = wz[, series],
+      screens = 1L, plot.type = plot_type,
+      type = type,
+      col = col, lwd = lwd, bty = "n",
+      xaxt = "n", yaxt = "n",
+      xlab = "", ylab = ""
+    )
+    plotArgs2 <- utils::modifyList(plotArgs2, dots$arguments, keep.null = TRUE)
+    plotArgs2$ylim <- y_lim
+
+    #plot(wz[, series], screens = 1L, plot.type = plot_type, type = type, col = col, lwd = lwd, bty = "n", xaxt = "n", yaxt = "n", xlab = "", ylab = "", ...) # I.e. 'plot.zoo()'.
+    do.call("plot", plotArgs2)
+  }
 
   legendArgs <- list(
     x = "topleft",
@@ -174,7 +263,7 @@ plot_series <- function(
     bty = "n",
     cex = 0.8
   )
-  legendArgs <- utils::modifyList(legendArgs, legend...)
+  legendArgs <- utils::modifyList(legendArgs, legend..., keep.null = TRUE)
   do.call(graphics::legend, legendArgs)
 
   ## LOESS smooth.
@@ -188,7 +277,7 @@ plot_series <- function(
         data = y[, c(x_var, series)],
         span = 0.2
       )
-      loessArgs <- utils::modifyList(loessArgs, loess...)
+      loessArgs <- utils::modifyList(loessArgs, loess..., keep.null = TRUE)
 
       l <- do.call(stats::loess, loessArgs)
 
@@ -197,7 +286,7 @@ plot_series <- function(
         y = l$fit,
         lwd = 2
       )
-      lines.loessArgs <- modifyList(lines.loessArgs, lines.loess...)
+      lines.loessArgs <- modifyList(lines.loessArgs, lines.loess..., keep.null = TRUE)
       if (is_invalid(lines.loessArgs$col))
         lines.loessArgs$col = col[s]
 
@@ -214,10 +303,8 @@ plot_series <- function(
       range = range(as.data.frame(w)[, x_var], na.rm = TRUE),
       lwd = trend_lwd,
       legend_inset = trend_legend_inset,
-      fmt = "%+1.2f",
-      unit = unit,
       trend_multiplier = 0,
-      denom_text = "/" %_% x_var,
+      rate_expression = sprintf("expression(Delta ~ \"= %%+1.2f %s/%s\")", unit, x_var),
       keep_default_trends = TRUE,
       sort_by_name = FALSE
     )
@@ -228,7 +315,7 @@ plot_series <- function(
         trendArgs$m <- list()
       length(trendArgs$m) <- length(series); names(trendArgs$m) <- series
     }
-    trendArgs <- utils::modifyList(trendArgs, trend...)
+    trendArgs <- utils::modifyList(trendArgs, trend..., keep.null = TRUE)
     if (!is_invalid(extra_trends))
       trendArgs$m <- append(trendArgs$m, extra_trends)
 
@@ -246,7 +333,8 @@ plot_series <- function(
       trendArgs$m[[i]]$lm <- lm(eval(substitute(b ~ x, list(b = as.name(names(trendArgs$m)[i]), x = as.name(x_var)))), data = trendArgs$m[[i]]$sdata, x = TRUE)
       trendArgs$m[[i]]$change <- coef(trendArgs$m[[i]]$lm)[2] * diff(range(trendArgs$m[[i]]$lm$model[, 2]))
       trendArgs$m[[i]]$rate <- coef(trendArgs$m[[i]]$lm)[2] * trendArgs$trend_multiplier
-      trendArgs$m[[i]]$rateText <- eval(substitute(expression(paste(Delta, " = ", r, phantom(l), unit, denom_text, sep = "")), list(r = sprintf(trendArgs$m[[i]]$rate, fmt = trendArgs$fmt), unit = trendArgs$unit, denom_text = trendArgs$denom_text)))
+      #trendArgs$m[[i]]$rateText <- eval(substitute(expression(paste(Delta, " = ", r, phantom(l), unit, denom_text, sep = "")), list(r = sprintf(trendArgs$m[[i]]$rate, fmt = trendArgs$fmt), unit = trendArgs$unit, denom_text = trendArgs$denom_text)))
+      trendArgs$m[[i]]$rateText <- eval_js(sprintf(trendArgs$rate_expression, trendArgs$m[[i]]$rate))
     }
     if (trendArgs$sort_by_name)
       trendArgs$m <- trendArgs$m[sort(names(trendArgs$m))]
@@ -287,7 +375,7 @@ plot_series <- function(
       segmentedArgs$x <- segmented...$x
       segmented...$x <- NULL
     }
-    segmentedArgs <- utils::modifyList(segmentedArgs, segmented...)
+    segmentedArgs <- utils::modifyList(segmentedArgs, segmented..., keep.null = TRUE)
     sm <- do.call("fit_segmented_model", segmentedArgs)
 
     for (i in names(sm$piecewise)) {
@@ -308,7 +396,7 @@ plot_series <- function(
         pch = NA_integer_, # Not necessary
         col = col[i]
       )
-      plot.segmentedArgs <- utils::modifyList(plot.segmentedArgs, plot.segmented...)
+      plot.segmentedArgs <- utils::modifyList(plot.segmentedArgs, plot.segmented..., keep.null = TRUE)
 
       if (!is.null(x) && inherits(x, "segmented")) {
         dev_null <- do.call("plot", plot.segmentedArgs)
@@ -321,7 +409,7 @@ plot_series <- function(
             vlineArgs <- list(
               mark_x = sprintf(sm$piecewise[[i]]$sm$psi[, 2], fmt = "%1.1f")
             )
-            vlineArgs <- utils::modifyList(vlineArgs, vline...)
+            vlineArgs <- utils::modifyList(vlineArgs, vline..., keep.null = TRUE)
             do.call("vline", vlineArgs)
           } else if (mark_segments == "points") {
             points.segmentedArgs <- list(
@@ -329,7 +417,7 @@ plot_series <- function(
               col = plot.segmentedArgs$col,
               pch = 4 # Like '×'
             )
-            points.segmentedArgs <- utils::modifyList(points.segmentedArgs, points.segmented...)
+            points.segmentedArgs <- utils::modifyList(points.segmentedArgs, points.segmented..., keep.null = TRUE)
             do.call(graphics::points, points.segmentedArgs)
           }
 
@@ -352,6 +440,9 @@ plot_series <- function(
 
   if (save_png)
     dev.off()
+
+  if (!add)
+    par(op)
 
   if (length(r) > 0L)
     return (invisible(r))
@@ -430,7 +521,7 @@ plot_sequential_trend <- function(
     ylab = ifelse(!is_invalid(ylab), ylab, "Trend"),
     main = ifelse(!is_invalid(main), main, "Linear Trend + 95% CIs")
   )
-  plotArgs <- utils::modifyList(plotArgs, plot...)
+  plotArgs <- utils::modifyList(plotArgs, plot..., keep.null = TRUE)
 
   if (is.language(plotArgs$main))
     plotArgs$main <- eval(plotArgs$main)
@@ -450,9 +541,9 @@ plot_sequential_trend <- function(
       col = scales::alpha("gray", 0.6),
       border = NA # Border color; NULL means use par("fg"), NA omits borders.
     )
-    ciArgs <- modifyList(ciArgs, ci...)
+    ciArgs <- modifyList(ciArgs, ci..., keep.null = TRUE)
 
-    do.call(graphics::polygon, ciArgs)
+    do.call(graphics::polygon, ciArgs, keep.null = TRUE)
   }
   else { # Use error bars to show confidence intervals.
     ciArgs <- list(
@@ -464,7 +555,7 @@ plot_sequential_trend <- function(
       angle = 90,
       code = 3
     )
-    ciArgs <- utils::modifyList(ciArgs, ci...)
+    ciArgs <- utils::modifyList(ciArgs, ci..., keep.null = TRUE)
 
     do.call(graphics::arrows, ciArgs)
   }
@@ -474,7 +565,7 @@ plot_sequential_trend <- function(
       mark_x = mark_xs,
       abline... = list(abline... = list(col = scales::alpha("red", 0.4)))
     )
-    vlineArgs <- utils::modifyList(vlineArgs, vline...)
+    vlineArgs <- utils::modifyList(vlineArgs, vline..., keep.null = TRUE)
 
     do.call(vline, vlineArgs)
   }
@@ -519,7 +610,7 @@ create_smooth_variables <- function(
     to = max(d[[x_var]], na.rm = TRUE),
     by = pad_by
   )
-  seqArgs <- utils::modifyList(seqArgs, seq...)
+  seqArgs <- utils::modifyList(seqArgs, seq..., keep.null = TRUE)
 
   if (!is.null(pad_by)) {
     attrs <- attributes(d)
@@ -551,7 +642,7 @@ create_smooth_variables <- function(
     if (verbose) cat("  Processing column \"" %_% i %_% "\".... ")
 
     interpNAArgs$x <- d[, i]
-    interpNAArgs <- utils::modifyList(interpNAArgs, interpNA...)
+    interpNAArgs <- utils::modifyList(interpNAArgs, interpNA..., keep.null = TRUE)
     d[[i %_% interpolated_suffix]] <- drop(do.call(interpNA, interpNAArgs))
 
     loessArgs = list(
@@ -559,7 +650,7 @@ create_smooth_variables <- function(
       data = d,
       span = 0.2
     )
-    loessArgs <- utils::modifyList(loessArgs, loess...)
+    loessArgs <- utils::modifyList(loessArgs, loess..., keep.null = TRUE)
 
     l <- do.call(stats::loess, loessArgs)
     d[[i %_% loess_suffix]] <- stats::predict(l, newdata = d[[x_var]]) # Use 'newdata' here to include NAs.
@@ -584,7 +675,7 @@ create_smooth_variables <- function(
       cluster = FALSE,
       ncores = NULL
     )
-    frfastArgs <- utils::modifyList(frfastArgs, frfast...)
+    frfastArgs <- utils::modifyList(frfastArgs, frfast..., keep.null = TRUE)
 
     if (frfastArgs$smooth != "splines")
       frfastArgs$formula <- eval(substitute(y ~ x_var, list(x_var = as.name(x_var))))
@@ -597,7 +688,7 @@ create_smooth_variables <- function(
       colnames(zz) <- c(x_var, i, unlist(sapply(c(lower_ci_suffix, "", upper_ci_suffix), function(a) paste0(i %_% sapply(deriv, sprintf, fmt = deriv_suffix_template), a), simplify = FALSE)))
 
       # interpNAArgs$x <- zz
-      # interpNAArgs <- utils::modifyList(interpNAArgs, interpNA...)
+      # interpNAArgs <- utils::modifyList(interpNAArgs, interpNA..., keep.null = TRUE)
       # zz <- drop(do.call(interpNA, interpNAArgs))
 
       zzz <- zz

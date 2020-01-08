@@ -16,7 +16,7 @@ saver <- function(..., file = stop("'file' must be specified"), save... = list()
     dev_null <- sapply(save...$list, function(s) assign(s, get(s), envir = e))
     dev_null <- NULL
 
-    l <- modifyList(l, as.list(e))
+    l <- modifyList(l, as.list(e), keep.null = TRUE)
     save...$list <- NULL
   }
 
@@ -26,7 +26,7 @@ saver <- function(..., file = stop("'file' must be specified"), save... = list()
     #eval.promises = TRUE,
     envir = list2env(l)
   )
-  saveArgs <- utils::modifyList(saveArgs, save...)
+  saveArgs <- utils::modifyList(saveArgs, save..., keep.null = TRUE)
 
   do.call("save", saveArgs)
 }

@@ -6,7 +6,7 @@ reload_all <- function(package_name, ..., export_all = FALSE, redocument = FALSE
     EXPR = package_name,
     "." # Default option.
   )
-  switchArgs <- utils::modifyList(switchArgs, getOption(option_name))
+  switchArgs <- utils::modifyList(switchArgs, getOption(option_name), keep.null = TRUE)
   packagewd <- do.call(switch, switchArgs)
 
   devtools::load_all(packagewd, export_all = export_all, ...)

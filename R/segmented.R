@@ -27,7 +27,7 @@ fit_segmented_model <- function(x,
       data = h,
       breaks = NULL
     )
-    breakpointsArgs <- utils::modifyList(breakpointsArgs, breakpoints...)
+    breakpointsArgs <- utils::modifyList(breakpointsArgs, breakpoints..., keep.null = TRUE)
     r$piecewise[[i]]$bp <- do.call(strucchange::breakpoints, breakpointsArgs)
 
     r$piecewise[[i]]$breaks <- r$piecewise[[i]]$bp$X[, xVar][r$piecewise[[i]]$bp$breakpoint]
@@ -39,7 +39,7 @@ fit_segmented_model <- function(x,
       random = FALSE,
       h = 0.3
     )
-    seg.controlArgs <- utils::modifyList(seg.controlArgs, seg.control...)
+    seg.controlArgs <- utils::modifyList(seg.controlArgs, seg.control..., keep.null = TRUE)
     segControl <- do.call(segmented::seg.control, seg.controlArgs)
 
     r$piecewise[[i]]$lm <- lm(breakpointsArgs$formula, data = h, x = TRUE, y = TRUE)
@@ -50,7 +50,7 @@ fit_segmented_model <- function(x,
       psi = r$piecewise[[i]]$breaks,
       control = segControl
     )
-    segmentedArgs <- utils::modifyList(segmentedArgs, segmented...)
+    segmentedArgs <- utils::modifyList(segmentedArgs, segmented..., keep.null = TRUE)
 
     run_segmented <- function()
     {

@@ -28,7 +28,7 @@ integratex <- function (x, y, from = min(x), to = max(x), type = c("spline", "li
       lower = from,
       upper = to
     )
-    integrateArgs <- utils::modifyList(integrateArgs, integrate...)
+    integrateArgs <- utils::modifyList(integrateArgs, integrate..., keep.null = TRUE)
     res <- do.call(stats::integrate, integrateArgs)
     #res <- stats::integrate(myfunction, lower = from, upper = to)$value
   }

@@ -70,7 +70,7 @@ summary_f <- function(x, as.factor = FALSE, ..., factor... = NULL)
   factorArgs <- list(
     x <- x
   )
-  factorArgs <- utils::modifyList(factorArgs, factor...)
+  factorArgs <- utils::modifyList(factorArgs, factor..., keep.null = TRUE)
 
   if (as.factor)
     f <- as.factor(x)
@@ -151,7 +151,7 @@ add_na <- function(x, ...)
 
   x <- addNA(x, ...)
 
-  attributes(x) <- utils::modifyList(attributes(x), att) # Restore object attributes.
+  attributes(x) <- utils::modifyList(attributes(x), att, keep.null = TRUE) # Restore object attributes.
   class(x) <- unique(classes, c(class(x)))
 
   return (x)
@@ -194,7 +194,7 @@ order_levels <- function(x, ...,
   levels(x) <- ll
   l <- levels(x)
   dots <- get_dots(...)
-  s <- dots$as_character
+  s <- sapply(dots$arguments, as.character)
   if (index)
     s <- l[as.integer(s)]
 
@@ -216,7 +216,7 @@ order_levels <- function(x, ...,
   if (add_na || hasNaLevel)
     x <- addNA(x, ifany = ifany)
 
-  attributes(x) <- utils::modifyList(att, attributes(x)) # Restore object attributes.
+  attributes(x) <- utils::modifyList(att, attributes(x), keep.null = TRUE) # Restore object attributes.
   class(x) <- unique(classes, c(class(x)))
 
   return (x)
@@ -357,13 +357,15 @@ rename_levels <- function(x, ...,
   nl <- ol
   names(nl) <- ol
 
-  named <- dots$as_character[dots$named_dots != ""]
+  argList <- sapply(dots$arguments, as.character)
+
+  named <- argList[dots$dots_names != ""]
   if (!is_invalid(named)) {
     named <- named[names(named) %in% ol]
     null <- sapply(names(named), function (s) names(nl)[names(nl) %in% s] <<- named[s]); null <- NULL
   }
 
-  unnamed <- dots$as_character[dots$named_dots == ""]
+  unnamed <- argList[dots$dots_names == ""]
   if (!is_invalid(unnamed)) {
     if (length(unnamed) > length(nl) - length(named))
       unnamed <- rep(unnamed, length.out = length(nl) - length(named))
@@ -395,7 +397,7 @@ rename_levels <- function(x, ...,
     mergeArgs <- list(
       x = x
     )
-    mergeArgs <- utils::modifyList(mergeArgs, merge...)
+    mergeArgs <- utils::modifyList(mergeArgs, merge..., keep.null = TRUE)
 
     x <- do.call("merge_levels", mergeArgs)
   }
@@ -411,7 +413,7 @@ rename_levels <- function(x, ...,
     orderArgs <- list(
       x = x
     )
-    orderArgs <- utils::modifyList(orderArgs, order...)
+    orderArgs <- utils::modifyList(orderArgs, order..., keep.null = TRUE)
 
     x <- do.call("order_levels", orderArgs)
   }
@@ -467,7 +469,7 @@ cut2q <- function(v, cuts, trim = FALSE, fmt = "%1.1f", dash = "--", ...)
   f <- Hmisc::cut2(v, cuts, ...)
   levels(f) <- ranges
 
-  attributes(f) <- utils::modifyList(attributes(f), att) # Restore object attributes.
+  attributes(f) <- utils::modifyList(attributes(f), att, keep.null = TRUE) # Restore object attributes.
 
   return (f)
 }
