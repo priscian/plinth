@@ -190,7 +190,7 @@ wavelength2col <- Vectorize(function(wavelength, Gamma = 0.8, IntensityMax = 255
 
 
 #' @export
-vline <- function(mark_x, abline... = list(), text... = list())
+vline <- function(mark_x, abline... = list(), text... = list(), y_prop = 0.9) # For 'y_prop' v. https://english.stackexchange.com/a/286524/26862
 {
   ablineArgs <- list(
     v = mark_x,
@@ -202,7 +202,7 @@ vline <- function(mark_x, abline... = list(), text... = list())
 
   textArgs <- list(
     x = mark_x,
-    y = par("yaxp")[2L],
+    y =  par("usr")[3] + ((par("usr")[4] - par("usr")[3]) * y_prop),
     labels = mark_x,
     cex = 0.8,
     srt = 270,
