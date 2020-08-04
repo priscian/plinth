@@ -44,14 +44,18 @@ plot_series <- function(
   col = NULL, col_fun = colorspace::rainbow_hcl, col_fun... = list(l = 65), alpha = 0.5, lwd = 2,
   main = "", xlab = "", ylab = "",
   unit = NULL,
+  dev.new... = list(), bg = NULL,
   add = FALSE,
+  xaxs = "r", yaxs = "r",
   conf_int = FALSE, conf_int_suffix = "_uncertainty", ci_alpha = 0.3, polygon... = list(),
   trend = FALSE, trend_lwd = lwd, trend_legend_inset = c(0.2, 0.2), trend... = list(), extra_trends = list(),
   loess = FALSE, loess... = list(), loess_series = NULL, lines.loess... = list(),
   segmented = FALSE, segmented... = list(),
   plot.segmented... = list(),
   mark_segments = c("none", "lines", "points"), vline... = list(), points.segmented... = list(),
-  legend... = list(),
+  legend_fun = graphics::legend, legend... = list(),
+  getMarginWidth... = list(), # To use, at least choose where the legend should go, e.g. 'side = 1'.
+  get_margin_width_expr = expression({ legend...$x <- get_cardinal_point("ne") }),
   start_callback = NULL, end_callback = NULL,
   save_png = FALSE, save_png_dir = ".", save_png_filename = "image.png",
   png... = list(),
@@ -138,9 +142,14 @@ plot_series <- function(
 
   ## Arguments for plotting.
   xaxt <- "n"
-  if (dev.cur() == 1L) # If a graphics device is active, plot there instead of opening a new device.
-    dev.new(width = 12.5, height = 7.3) # New default device of 1200 × 700 px at 96 DPI.
-    #dev.new(width = 7.3, height = 7.3) # New default device of 700 × 700 px at 96 DPI.
+  if (dev.cur() == 1L) { # If a graphics device is active, plot there instead of opening a new device.
+    dev.newArgs <- list(
+      width = 12.5, height = 7.3 # New default device of 1200 × 700 px at 96 DPI
+      # width = 7.3, height = 7.3 # New default device of 700 × 700 px at 96 DPI
+    )
+    dev.newArgs <- utils::modifyList(dev.newArgs, dev.new..., keep.null = TRUE)
+    do.call(dev.new, dev.newArgs)
+  }
 
   ## Find CIs now so that plot region can expand automatically to accomodate them.
   if (conf_int) {
@@ -172,8 +181,8 @@ plot_series <- function(
   }
 
   ## If there are CIs & 'ylim' is NULL, make extra vertical room for the CIs.
-  dots <- get_dots(...)
-  y_lim <- dots$arguments$ylim
+  dots <- get_dots(..., evaluate = TRUE)
+  y_lim <- dots$evaluated$ylim
 
   if (is.null(y_lim) && exists("polygon_args")) {
     range_y_ci <- sapply(polygon_args,
@@ -193,22 +202,54 @@ plot_series <- function(
     x <- w[, series],
     plot.type = plot_type,
     type = "n",
-    xaxs = "r", xaxt = "s",
+    xaxs = xaxs, yaxs = yaxs,
+    xaxt = "n", yaxt = "n",
     xlab = xlab, ylab = ylab, main = main
   )
-  plotArgs1 <- utils::modifyList(plotArgs1, dots$arguments, keep.null = TRUE)
+  plotArgs1 <- utils::modifyList(plotArgs1, dots$evaluated, keep.null = TRUE)
   plotArgs1$ylim <- y_lim
 
   if (!add) {
     op <- par(mar = c(5, 5, 4, 2) + 0.1) # Add some extra space for exponents &c. on the left margin.
-    #plot(w[, series], plot.type = plot_type, type = "n", xaxs = "r", xaxt = "s", xlab = xlab, ylab = ylab, main = main, ...)
-    do.call("plot", plotArgs1)
+
+    do.call("plot", plotArgs1) # I.e. 'plot.zoo()'
+
+    if (!is_invalid(getMarginWidth...)) {
+      legendArgs = list(xpd = TRUE)
+      legend... <- utils::modifyList(legend..., legendArgs, keep.null = TRUE)
+
+      legendText <- series %_% ifelse(loess, " (+ LOESS)", "")
+      if (!is.null(legend...$legend)) legendText <- legend...$legend
+
+      getMarginWidthArgs <- list(
+        labels = legendText,
+        is.legend = TRUE
+      )
+      getMarginWidthArgs <- utils::modifyList(getMarginWidthArgs, getMarginWidth..., keep.null = TRUE)
+      newMarginInfo <- do.call(plotrix::getMarginWidth, getMarginWidthArgs)
+
+      par(mar = c(par("mar")[1:3], newMarginInfo$newmar))
+      expr <- get_margin_width_expr
+      if (!is.null(expr)) {
+        if (is.function(expr)) {
+          expr()
+        } else if (rlang::is_expression(expr)) {
+          rlang::eval_tidy(expr)
+        } else if (is.expression(expr)) {
+          eval(expr)
+        }
+      }
+    }
   }
   if (maText != "") graphics::mtext(maText, 3L)
 
   ## N.B. I need more control over the grid here:
   if (!add) {
     grid(nx = NULL, ny = NULL, col = "lightgray", lty = "dotted", lwd = par("lwd"))
+  }
+
+  if (!is.null(bg)) {
+    graphics::rect(par("usr")[1], par("usr")[3], par("usr")[2], par("usr")[4], border = NA, col = bg)
   }
 
   ## Evaluate expression after creating graphics device but before plotting series.
@@ -227,32 +268,33 @@ plot_series <- function(
       x = wz[, plotSeries[i]],
       type = type,
       col = col[i], lwd = lwd,
-      bty = "n",
-      xaxt = "n", yaxt = "n",
+      #bty = "n",
+      xaxs = xaxs, yaxs = yaxs,
+      xaxt = "s", yaxt = "s",
       xlab = "", ylab = ""
     )
-    plotArgs2 <- utils::modifyList(plotArgs2, dots$arguments, keep.null = TRUE)
+    plotArgs2 <- utils::modifyList(plotArgs2, dots$evaluated, keep.null = TRUE)
     plotArgs2$ylim <- y_lim
 
     plotSeries <- series
     for (i in seq_along(plotSeries))
-      #lines(wz[, plotSeries[i]], type = type, col = col[i], lwd = lwd, bty = "n", xaxt = "n", yaxt = "n", xlab = "", ylab = "", ...) # I.e. 'plot.zoo()'.
-      do.call("lines", plotArgs2)
+      do.call("lines", plotArgs2) # I.e. 'lines.zoo()'
   }
   else {
     plotArgs2 <- list(
       x = wz[, series],
       screens = 1L, plot.type = plot_type,
       type = type,
-      col = col, lwd = lwd, bty = "n",
-      xaxt = "n", yaxt = "n",
+      col = col, lwd = lwd,
+      #bty = "n",
+      xaxs = xaxs, yaxs = yaxs,
+      xaxt = "s", yaxt = "s",
       xlab = "", ylab = ""
     )
-    plotArgs2 <- utils::modifyList(plotArgs2, dots$arguments, keep.null = TRUE)
+    plotArgs2 <- utils::modifyList(plotArgs2, dots$evaluated, keep.null = TRUE)
     plotArgs2$ylim <- y_lim
 
-    #plot(wz[, series], screens = 1L, plot.type = plot_type, type = type, col = col, lwd = lwd, bty = "n", xaxt = "n", yaxt = "n", xlab = "", ylab = "", ...) # I.e. 'plot.zoo()'.
-    do.call("plot", plotArgs2)
+    do.call("plot", plotArgs2) # I.e. 'plot.zoo()'
   }
 
   legendArgs <- list(
@@ -264,7 +306,7 @@ plot_series <- function(
     cex = 0.8
   )
   legendArgs <- utils::modifyList(legendArgs, legend..., keep.null = TRUE)
-  do.call(graphics::legend, legendArgs)
+  do.call(legend_fun, legendArgs)
 
   ## LOESS smooth.
   if (loess) local({
@@ -272,9 +314,15 @@ plot_series <- function(
     if (!is_invalid(loess_series))
       loessSeries <- loess_series
     for (s in loessSeries) {
+      # loessArgs = list(
+      #   formula = eval(substitute(s ~ x, list(s = as.name(s), x = as.name(x_var)))),
+      #   data = y[, c(x_var, series)],
+      #   span = 0.2
+      # )
+      xl <- as.vector(y[, x_var])
+      yl <- as.vector(y[, s])
       loessArgs = list(
-        formula = eval(substitute(s ~ x, list(s = as.name(s), x = as.name(x_var)))),
-        data = y[, c(x_var, series)],
+        formula = yl ~ xl,
         span = 0.2
       )
       loessArgs <- utils::modifyList(loessArgs, loess..., keep.null = TRUE)

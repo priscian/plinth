@@ -27,9 +27,13 @@ latex_plot <- function(x, ...)
 #' @export
 latex_plot.default <- function(x, ...,
   lp_fun = plot,
-  devices = list(`grDevices::pdf` = list(height = 8.27, width = 11.69), `devEMF::emf` = list(ext = "emf"), `grDevices::png` = list(height = 8.27, width = 11.69)),
+  devices = list(
+    `grDevices::pdf` = list(height = 8.27, width = 11.69, ext = "pdf"),
+    `devEMF::emf` = list(ext = "emf"),
+    `grDevices::png` = list(height = 8.27, width = 11.69, units = "in", ext = "png")
+  ),
   cap = "", short_caption = cap,
-  path_base = "image", graphics_path = "./images/",
+  path_base = "image", graphics_path = "./images",
   latex,
   translate_latex = TRUE,
   create_plots = TRUE,
@@ -53,7 +57,8 @@ latex_plot.default <- function(x, ...,
   }
 
   figNum <- sprintf("%04d", get_latex_plot_counter())
-  pathName <- graphics_path %_% path_base %_% "-" %_% figNum
+  #pathName <- graphics_path %_% path_base %_% "-" %_% figNum
+  pathName <- paste(graphics_path, path_base %_% "-" %_% figNum, sep ="/")
 
   if (create_plots) {
     for (d in names(devices)) {
@@ -84,4 +89,36 @@ latex_plot.default <- function(x, ...,
   increment_latex_plot_counter()
 
   return (nop())
+}
+
+
+## Some corrections to the "Hmisc" package's 'latex()' functions.
+latex_correct_insert_bottom <- function(l)
+{
+  ## The following is to fix a problem with Hmisc 3.14-6 in which definitions at the bottom of tables created by 'latex.summary.reverse()' aren't separated by LaTeX newlines.
+  l[length(l)] <- gsub("\\.", "\\.\\\\\\\\", l[length(l)])
+  l[length(l)] <- gsub("\\:", "\\:\\\\\\\\", l[length(l)])
+
+  l
+}
+
+
+latex_correct_caption_position <- function(l)
+{
+  ## Move caption outside "size" brackets so that the short caption can show up in PDF bookmarks.
+  captionIndex <- grep("^\\\\caption", l)
+  if (length(captionIndex) > 0L) {
+    captionIndex <- head(captionIndex, 1L)
+    relsizeIndex <- grep("^\\{\\\\(relsize|larger|smaller|relscale|textlarger|textsmaller|textscale)", l)
+    if (length(relsizeIndex) > 0L) {
+      relsizeIndex <- head(relsizeIndex, 1L)
+      if (captionIndex == relsizeIndex + 1L) {
+        temp <- l[captionIndex]
+        l[captionIndex] <- l[relsizeIndex]
+        l[relsizeIndex] <- temp
+      }
+    }
+  }
+
+  l
 }

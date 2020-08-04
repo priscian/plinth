@@ -12,6 +12,13 @@ unfactor  <- function(x, ...)
 
 
 #' @export
+unfactor.default <- function(x, ...)
+{
+  return (x)
+}
+
+
+#' @export
 unfactor.factor <- function(x, ...)
 {
   return (levels(x)[x])

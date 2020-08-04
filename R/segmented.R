@@ -30,7 +30,10 @@ fit_segmented_model <- function(x,
     breakpointsArgs <- utils::modifyList(breakpointsArgs, breakpoints..., keep.null = TRUE)
     r$piecewise[[i]]$bp <- do.call(strucchange::breakpoints, breakpointsArgs)
 
-    r$piecewise[[i]]$breaks <- r$piecewise[[i]]$bp$X[, xVar][r$piecewise[[i]]$bp$breakpoint]
+    #r$piecewise[[i]]$breaks <- r$piecewise[[i]]$bp$X[, xVar][r$piecewise[[i]]$bp$breakpoint]
+    r$piecewise[[i]]$breaks <-
+      r$piecewise[[i]]$bp$X[, which(colnames(r$piecewise[[i]]$bp$X) %in%
+        c(xVar, backtick(xVar)))][r$piecewise[[i]]$bp$breakpoint]
 
     seg.controlArgs <- list(
       fix.npsi = FALSE,
@@ -42,11 +45,14 @@ fit_segmented_model <- function(x,
     seg.controlArgs <- utils::modifyList(seg.controlArgs, seg.control..., keep.null = TRUE)
     segControl <- do.call(segmented::seg.control, seg.controlArgs)
 
-    r$piecewise[[i]]$lm <- lm(breakpointsArgs$formula, data = h, x = TRUE, y = TRUE)
+    ## Set up new variable names to avoid potential problems in 'segmented::segmented()':
+    hh <- h; names(hh) <- c("x", "y")
+    r$piecewise[[i]]$lm <- lm(y ~ x, data = hh, x = TRUE, y = TRUE)
 
     segmentedArgs <- list(
       obj = r$piecewise[[i]]$lm,
-      seg.Z = as.formula(paste("~", xVar)),
+      #seg.Z = substitute(~ X, list(X = as.name(xVar))),
+      seg.Z = ~ x,
       psi = r$piecewise[[i]]$breaks,
       control = segControl
     )

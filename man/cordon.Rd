@@ -4,11 +4,21 @@
 \alias{cordon}
 \title{Evaluate Function inside an Environment and Extract and Save Any Useful Variables from Its Body}
 \usage{
-cordon(fun, ..., arguments = list(), envir = environment(),
-  file_path = NULL, variables = NULL, copy_args = FALSE,
-  timestamp = TRUE, timestamp... = list(), action = c("run", "save",
-  "load", "skip", "archive"), evaluate_dots = TRUE,
-  create_path_dir = TRUE, verbose = TRUE)
+cordon(
+  fun,
+  ...,
+  arguments = list(),
+  envir = environment(),
+  file_path = NULL,
+  variables = NULL,
+  copy_args = FALSE,
+  timestamp = TRUE,
+  timestamp... = list(),
+  action = c("run", "save", "load", "skip", "archive"),
+  evaluate_dots = TRUE,
+  create_path_dir = TRUE,
+  verbose = TRUE
+)
 }
 \arguments{
 \item{fun}{The function to be evaluated.}

@@ -123,3 +123,8 @@ geometric_mean <- function(x, na.rm = TRUE, zero.propagate = FALSE)
     exp(sum(log(x[x > 0]), na.rm = na.rm) / length(x))
   }
 }
+
+
+## Returns all permutations of vector x as an array; addresses the lack in base R.
+#' @export
+permute <- function(x) { P <- NULL; for(i in seq_along(x)) P <- rbind(P, cbind(x[i], permute(x[-i]))); P }

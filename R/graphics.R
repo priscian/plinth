@@ -114,11 +114,13 @@ color_nm_map <- c(
   red = 700,
   orange = 620,
   yellow = 580,
+  yg = 560,
   green = 530,
   cyan = 500,
   blue = 470,
   indigo = 450,
-  violet = 420
+  violet = 420,
+  uv = 300
 )
 
 ## V. JavaScript source for https://academo.org/demos/wavelength-to-colour-relationship/
